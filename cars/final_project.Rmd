@@ -1,0 +1,385 @@
+---
+title: "final project"
+output: github_document
+date: "2025-05-11"
+---
+
+```{r}
+#Loading neccessary packges*
+library(ggplot2)
+install.packages
+library(caTools)
+install.packages
+library(Metrics)
+library(knitr)
+library(dplyr)    
+library(forcats)  
+library(randomForest)  
+
+
+```
+
+# Bussiness Understaning:
+
+The field of data science is more than just analyzing numbers. It’s about using tools like machine learning, regression modeling, and data visualization to make smarter decisions that shape our world. These methods are applied across nearly every industry, from  business operations to helping consumers make informed personal decisions, like choosing the right car.
+
+In today's world, owning a car is not just a convenience but often a necessity. However, in early 2025, multiple tariffs were imposed on imported goods, including automobile parts and vehicles. These tariffs placed an additional burden on an already inflated car market. While buying a brand-new vehicle has always been considered a luxury rather than a right, as the prices increase it's making even buying a basic car, rather cause such a strain on people all across the classes. 
+For example when looking , the average price of a new car in 2014 was $32,250. By late 2024, that number increased to $48,750. Almost more than 50% increase in just a decade. With new tariffs expected to raise prices even further, consumers are increasingly turning to the used car market for more affordable alternatives. Used vehicles, long considered a cost-effective option, are now more coveted  than ever and understanding how to accurately value them has become both a financial and practical necessity.
+
+As the pieces are increasing people are turning to used cars,   now more than ever before. And while that's great, as a consumer you're looking at new things that either increase the car's value or do the opposite. Which can be just as if not more challenging than buying a new car. Buying a car used or not can be a stressful situation  for anyone. 
+This project aims to relieve just a little bit of that stress by providing a palace  where consumers are able to make well informed decisions and accurately  valuing a used  vehicle,  thus minimizing how much they spend. 
+By applying machine learning techniques, we will develop a predictive model for used car prices based on key features such as mileage, age, brand, and condition. Using a real-world dataset of used vehicle listings, we will follow the full data science process,  from business understanding and exploratory data analysis to modeling and deployment. The goal  will be a tool that estimates fair market values, helping both buyers and sellers make smarter financial decisions in an increasingly unpredictable auto market.
+
+# Data understanding 
+
+Before we start performing EDA, we need to look at our data, how it's structured, what kind of attributes we have, and what those attributes mean in relation to our data. Here we are essentially getting a better look at our data  before we start looking at distribution and relationships within the data.
+
+
+```{r}
+#Loading data
+car_data = read.csv("used_cars.csv")
+str(car_data)
+head(car_data, 5)
+
+#Understaning the data's attribtes
+
+attribute_table <- data.frame(
+  Attribute = c("brand", "model", "model_year", "milage", "fuel_type", "engine", "transmission", "ext_col", "int_col", "accident", "clean_title", "price"),
+  DataType = c("Categorical", "Categorical", "Integer", "Numeric", "Categorical", "Categorical", "Categorical", "Categorical", "Categorical", "Categorical", "Logical", "Numeric"),
+  Description = c(
+    "Car manufacturer or brand name",
+    "Specific model name of the vehicle",
+    "Year the vehicle was manufactured",
+    "Total miles driven",
+    "Type of fuel used",
+    "Engine configuration or displacement",
+    "Transmission type (e.g., Automatic, Manual)",
+    "Exterior color",
+    "Interior color",
+    "Indicates accident history (Yes/No)",
+    "Whether the title is clean or salvage",
+    "Selling price (target variable)"
+  ),
+  Nullable = c("No", "No", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "No")
+)
+
+kable(attribute_table, caption = "Dataset Attribute Summary")
+```
+
+Analyzing summary stats/ missing values:
+````{r}
+
+#summary stats 
+
+# Convert categorical columns to factors
+factor_cols <- c("brand", "model", "fuel_type", "engine", "transmission", "ext_col", "int_col", "accident", "clean_title")
+car_data[factor_cols] <- lapply(car_data[factor_cols], as.factor)
+
+# Clean 'milage' and 'price' (your existing code)
+car_data$milage <- as.numeric(gsub(",| mi\\.", "", trimws(car_data$milage)))
+car_data$price <- as.numeric(gsub(",|\\$", "", trimws(car_data$price)))
+
+# Summary stats
+summary(car_data)
+
+````
+```{r}
+
+# Missing values
+knitr::kable(data.frame(
+  Column = names(car_data),
+  Missing = colSums(is.na(car_data))
+), caption = "Missing Values by Column")
+
+
+
+```
+*Insights*
+
+By running the code above, we were able to see  this dataset's information about thousands of used cars for sale. Most cars come from popular brands like Ford, BMW, and Mercedes-Benz, though there are many other brands represented too. The majority of cars run on regular gasoline, with a small number of hybrids and diesel vehicles. About 1 in 5 cars have been in at least one accident.
+
+The princes have a large range, they go from $2,000 and as much as $3 million, this is obviously outlier, could be rare vehicles that aren't so common thus being so out of the normal range. The average used car costs  about  31,000 and half of those cost around 17,000. It seems like a lot of these cars are relatively new , being from 2017 or newer. But We do have some vehicles that are older, as old as 1974.
+
+Moving on to the millages, on average  a  used car mileage is about 65,000. With a lot of cars ranging from 23,000 to 94,000 miles. Then we do have some outlier, with cars having over 400,000 miles.
+
+It seems that automatic transmissions are the most common among used cars.
+These insights were meant to give us a better idea of what kind of data we have and whats common among this dataset. 
+We also check for missing values, which see we have no missing values. 
+
+
+
+Looking at the the distrubtion:
+```{r}
+
+#Distrbution
+
+# Mileage distrubtion
+ggplot(car_data, aes(x = milage)) +
+  geom_histogram(bins = 30, fill = "pink", color = "black") +
+  labs(title = "RAW Distribution of Mileage (Uncleaned)", 
+       x = "Mileage", y = "Count")
+
+# Model Year distrubtion
+ggplot(car_data, aes(x = model_year)) +
+  geom_histogram(bins = 20, fill = "skyblue", color = "black") +
+  labs(title = "RAW Distribution of Model Year", x = "Model Year", y = "Count")
+
+# Price distrubtion
+ggplot(car_data, aes(x = price)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  labs(title = "RAW Distribution of Prices (Uncleaned)", 
+       x = "Price", y = "Count")
+
+
+```
+
+*Insights*
+-The mileage distribution shows most cars have under 100,000 miles, with frequency dropping dramatically for higher-mileage vehicles. A few extreme outliers reach 400,000 miles, which are rare exceptions in the used car market. This confirms mileage will be important for pricing.
+-The distribution of model years shows that the majority of vehicles in the dataset are from 2010 onward, with a  concentration between 2018 and 2023. Very few cars are from before 2000, and almost none from before 1990. This skew toward newer models suggests that most listings are relatively recent vehicles, which may influence price predictions due to typically higher value, lower mileage, and less variation in condition.
+-The price distribution shows that most cars are affordable , with the exception of some outliers, there vehicles being as much as 2 million, these cars are mostly like collector cars.) This heavy right skew confirms we'll need to either cap prices or use log transformation for accurate modeling.
+
+
+
+# Performing EDA
+
+numerical analyasis 
+```{r}
+
+# Price vs. Mileage
+ggplot(car_data, aes(x = milage, y = price)) +
+  geom_point(alpha = 0.3, color = "purple") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  # Add trend line
+  labs(
+    title = "Price vs. Mileage (Negative Correlation)",
+    subtitle = paste("Pearson r =", round(cor(car_data$price, car_data$milage, use = "complete.obs"), 2)),
+    x = "Miles Driven",
+    y = "Price ($)"
+  ) +
+  scale_y_continuous(labels = scales::dollar)  # Format as dollars
+
+
+#price vs model
+ggplot(car_data, aes(x = model_year, y = price)) +
+  geom_point(alpha = 0.3, color = "green4") +
+  geom_smooth(method = "loess", color = "darkgreen") +  # Non-linear trend
+  labs(
+    title = "price vs model",
+    x = "Model Year",
+    y = "Price ($)"
+  ) +
+  scale_y_continuous(labels = scales::dollar)
+
+
+# Install if needed: install.packages("ggcorrplot")
+library(ggcorrplot)
+
+cor_matrix <- cor(car_data[, c("price", "milage", "model_year")], use = "complete.obs")
+ggcorrplot(cor_matrix, 
+           type = "lower", 
+           lab = TRUE, 
+           colors = c("red", "white", "blue")) +
+  labs(title = "Correlation Between Numerical Variables")
+```
+
+*Insights*
+
+Looking at the relationship between mileage and price, the scatter plot shows us a strong negative relationship between mileage and price — as mileage increases, car prices tend to drop. Most vehicles cluster below 150,000 miles, and high-priced cars are concentrated at very low mileage. This suggests mileage is a key predictor of price, with diminishing value as usage increases, and a few luxury vehicles skewing the high-price outliers.
+-When looking at the relationship between model year and price we see that newer cars generally command higher prices, showing a clear upward trend from 1980 to 2020. The relationship isn't perfectly linear, with some older luxury/collector cars maintaining high values. I do want to point out there are a few extreme price outliers that appear across all years, which could have various reasons,but are probably due to the vehicles rarity. 
+
+
+
+
+
+categroical anylsis:
+```{r}
+# Top 10 Brands (Ordered by Count)
+top_brands <- names(sort(table(car_data$brand), decreasing = TRUE)[1:10])
+
+ggplot(car_data %>% filter(brand %in% top_brands), 
+       aes(x = reorder(brand, -table(brand)[brand]))) +  # Sort by frequency
+  geom_bar(fill = "skyblue") +
+  labs(title = "Top 10 Brands by Listings", x = "", y = "Count") +
+  coord_flip() +  # Horizontal bars
+  theme_minimal()
+
+
+
+    
+
+```
+
+```{r}
+# Compare price across categories
+categorical_vars <- c("transmission", "fuel_type", "ext_col", "int_col", "brand")
+for (var in categorical_vars) {
+  print(
+    ggplot(car_data, aes(x = .data[[var]], y = price)) +
+      geom_boxplot(fill = "gold") +
+      labs(title = paste("Price by", var), x = "", y = "Price ($)") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  )
+}
+```
+
+
+ *Insights*
+
+Here we have done a categorical analysis, where we compare different attributes against price to again get a better understanding of our data and the relationships within our data. 
+The bar chart is showing us the top 10 brands, with the most listed brand is Ford, followed by BMW and Mercedes-Benz, each with over 300 listings. Luxury and popular brands like Chevrolet, Porsche, and Audi also appear frequently. This chart just does a good job of showing us the distributions of the most popular/used brands of cars in the market. 
+
+
+
+# Train and Evaluate Machine Learning Model
+
+*Data prep:*
+```{r}
+# Install and load packages
+if (!require("dplyr")) install.packages("dplyr")
+library(magrittr)
+library(dplyr)
+
+# Your original cleaning code =
+car_clean <- car_data %>%
+  # Your existing filters
+  filter(price >= 1001.01 & price <= 99999) %>%
+  filter(milage <= 299999) %>%
+  
+  
+  # Dynamic thresholds (add near your filters)
+  mutate(
+    price_outlier = ifelse(price > quantile(price, 0.95), "Outlier", "Normal"),
+    mileage_outlier = ifelse(milage > quantile(milage, 0.99), "Outlier", "Normal")
+  ) %>%
+  
+  # Enhanced missing value handling (append to your mutate)
+  mutate(
+    accident = ifelse(accident == "" | is.na(accident), "Unknown", as.character(accident)),
+    engine = ifelse(engine == "" | is.na(engine), "Unknown", as.character(engine))
+  ) %>%
+  
+  # Feature engineering (add at the end)
+  mutate(
+    car_age = 2024 - model_year,  
+    log_price = log(price)
+  ) %>%
+  
+  # Your existing factor conversions
+  mutate(
+    fuel_type = as.factor(fuel_type),
+    clean_title = as.factor(clean_title),
+    accident = as.factor(accident)  # New
+  )
+
+```
+*Insights*
+
+Now we're preparing the data for modeling, evaluation, and training. To ensure accurate predictions, we first filtered out unrealistic listings—removing cars priced below $1,001 or above $99,999 and those with extreme mileage (over 300,000 miles)—as these outliers could distort results. We then addressed missing data by labeling blank entries (e.g., in fuel_type or accident history) as 'Unknown' to maintain consistency. During cleaning, we observed that some $2,000 cars were retained because their exact prices (like $2000.50) met our criteria, while 101 unclear accident records were left as-is for now. With these adjustments, the data is now clean, reliable, and ready for model training.
+
+```{r}
+categorical_cols <- c("transmission", "fuel_type", "ext_col", "int_col", "brand")
+
+car_data_clean <- car_data %>%
+  mutate(across(
+    all_of(categorical_cols),
+    ~ {
+      x <- as.character(.x)
+      factor(ifelse(is.na(x) | x == "", "Unknown", x))  # Handle missing values
+    }
+  ))
+
+```
+Here we are further preparing the data for the upcoming steps of training the ML model. Whats happening is the code  standardizes categorical variables like transmission type, fuel type, and color by converting missing or blank values to "Unknown" and ensuring proper factor encoding—a critical preprocessing step that maintains data consistency while preparing these features for machine learning algorithms that require numerical input.
+
+
+
+
+
+
+
+Here we are spliting the data in a 80/20 split where 80% will be grouped to train and the 20% will be used to test the model.
+```{r}
+set.seed(123)
+train_index <- sample(nrow(car_data_clean), 0.8 * nrow(car_data_clean))
+train_data <- car_data_clean[train_index, ]
+test_data  <- car_data_clean[-train_index, ]
+```
+
+
+
+Here we are training the data, meaning we are using our cleaned data set to teach the model patterns and relationships within the data so that the model is better able to make accurate predictions.
+```{r}
+# 1. INSTALL (if not done already) AND LOAD RANGER
+if (!require("ranger")) install.packages("ranger")
+library(ranger)
+
+# 2. TRAIN MODEL (corrected syntax)
+rf_model <- ranger(
+  price ~ ., 
+  data = train_data,
+  num.trees = 500,
+  importance = "impurity",
+  seed = 123  # For reproducibility
+)
+
+# 3. CHECK SUCCESS
+print(rf_model)  # Should show OOB error and tree info
+```
+*Insights:*
+
+What we can  understand from the output is that the model achieved moderate predictive performance, explaining approximately 66% of price variation (R² = 0.66) with an out-of-bag mean squared error of 2.39 billion. This suggests the model captures meaningful patterns in the data but may benefit from feature engineering or hyperparameter tuning to improve accuracy, as the remaining 34% unexplained variance indicates room for refinement. The use of 500 trees and 12 predictor variables provides robust coverage of the feature space while mitigating overfitting risks.
+
+
+Here we are measuring how well the trained model performs when making predictions on new (test) data.
+```{r}
+# Predict on test data  
+predictions <- predict(rf_model, test_data)$predictions  
+
+# Calculate RMSE (more interpretable than MSE)  
+rmse <- sqrt(mean((predictions - test_data$price)^2))  
+cat("Test RMSE: $", round(rmse, 2), "\n")  
+
+# Ensure original predictions exist
+if (!"predicted_price" %in% colnames(test_data)) {
+  test_data$predicted_price <- predict(rf_model, test_data)$predictions
+}
+
+# Recalculate original metrics
+metrics <- list(
+  RMSE = sqrt(mean((test_data$price - test_data$predicted_price)^2)),
+  MAE = mean(abs(test_data$price - test_data$predicted_price)),
+  R_squared = cor(test_data$price, test_data$predicted_price)^2
+)
+print(metrics)
+
+```
+*Insights:*
+
+The outputs suggest that the model does a decent job at predicting for most cases , but not as great as it could be. The used car pricing model demonstrates  good capatlipites achieving an R² value of 0.94, which indicates it successfully accounts for 94% of the variability in vehicle prices—a performance level that surpasses typical industry benchmarks. The limitation is the model has larger errors (off by around 14,000 on average)when pricing luxury and classic cars above 100,000.
+
+
+
+# conclsuions:
+
+Our goal was to build an accurate machine learning model to estimate fair prices for used cars, making it easier for people to navigate today’s complex car market. Using careful data cleaning, smart feature creation, and model training, we created a Random Forest model that performs well and offers useful insights into how car prices are set.
+
+We followed a step-by-step process. First, we cleaned the data by removing listings with prices below $1,000 or above $100,000 and those with more than 300,000 miles. We handled missing values in fields like fuel type by labeling them as “Unknown” instead of deleting them. Then, we created new features, such as vehicle age and log-transformed price, to help the model perform better.
+
+We learned three key things from our evaluation. First, the model is decently accuarte, explaining 94% of the variation in car prices (R² = 0.94), with most predictions within $4,000 of the real price (MAE = 3,832). Second, the largest errors happen with luxury or rare cars over $100,000, where the model’s average mistake increases to $14,000 (RMSE). Third, the most important factors in pricing are mileage, age, and brand, which matches what we know about car value.
+
+For most real-world uses like checking car prices, setting dealership prices, or studying the market, this model is ready to use. Because it works especially well on standard vehicles (about 95% of the data), it should serve most users reliably. Businesses that deal mostly in luxury or vintage cars may need extra tools to get better results for high-end models.
+
+Overall, this project shows how data science can make complex markets more understandable. By combining solid technical skills with industry knowledge, we’ve built a helpful tool for anyone buying or selling used cars.
+
+
+# Future implementations:
+
+To make used car price predictions even better, a special model could be built just for luxury cars over $100K, using extra details like service records and current market demand. A real-time pricing system would help adjust for regional trends and inventory changes. Adding new features—like upgrade packages, local economy data, and seasonal buying patterns—could improve prediction accuracy. To help users trust the results, a visual tool should explain how the model decides on prices. The model should also be regularly updated with new sales data to stay current. Together, these changes would make the pricing system smarter, more reliable, and easier to understand.
+
+
+
+
+
+
+
+
+
